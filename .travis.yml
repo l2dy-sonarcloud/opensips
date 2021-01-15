@@ -1,6 +1,8 @@
 language: c
 os: linux
 dist: bionic
+compiler: gcc
+env: COMPILER=gcc
 addons:
   apt:
     packages:
@@ -34,60 +36,16 @@ addons:
       - python-dev
       - libmaxminddb-dev
 #      - libjwt-dev
+  sonarcloud:
+    organization: "l2dy-sonarcloud"
+    token:
+      secure: "GwgekzdRdJHGFgQfygtKKgw7ymuFW2rRMweVS/hd9fiL9gJ1rRC09sNf0DU0XLG07weKrxJEa3mwG7xcttEllMknObp9W9tAQwKiO9npIcIMX2EwMqZaJAYqcMRFesEgR8IA34N/n/mqNYzM0tZz4hN5u1MlNSfaaut7Yifu3qf2BgsLn/XQe0ll58/qaWqrKD+Ns7PZzdY30MtdpTFZNrn9nLP8TVl6G7ZUR09BkrXADevhpeePQetSl5SBX5xu1Yx+uwPUQR7SbpBdE/rHzDbFfzoLjIm33I97pzztaxERMH1vyjAfHbG/kCb4Ggj3PHyubYUragIn0E8zQaJWLr9eT3gRpei/qJNnAyysVuZGduTEn0YrolgImtiAxDUgyPt2GpGKi97+t6snXdnEax0Hj92MzSTvFKuJhE+T4NX0ihep3PfDadE0FhuE4jyKiRrOcfqfNN5mU6eDWYo1Ut+/f3tL1HABM1XGHI/AcpYB1/5aL2POC2bEVCKnnryfY0Z52/AT8RxmQnJTwv1M6YBv5HcwwxdcyI8H458e0+asLQuVNjj0IhT1EC/fh2JBNFjtmzogetwBpLVoCSrO0SJVeVWkewkArumBy30ffYr2wp5M6J0Cci5C2pmKDzyPdaFjVPihzozYAxzyaImmr8daejlav6ShZPlV60L/OiY=" # encrypted value of your token
+
 before_install: sh -x scripts/build/install_depends.sh
-script: sh -x scripts/build/do_build.sh
-notifications:
-  irc:
-    channels:
-      - "chat.freenode.net#opensips"
-    on_success: change
-    on_failure: always
-  slack:
-    secure: MnRvw68QpJHUSZ/IRGUlAjQ62xs3LtEZ0g3pG7Bms0XotuK+YxmSZh7BgV61utuya295LTvdWZQYiutJ4+iPKdF7Mb1KCzaUbY6nrGaIbqif10CKwfIFRsENMhYUKOXdvg52103GNq3/V3/6PGX7Jtiaox9lHcfRhvljs+cUgSk=
-    on_success: change
-    on_failure: always
-jobs:
-  include:
-    - name: "Build with GCC 7 @ Ubuntu 16"
-      dist: xenial
-      compiler: gcc
-      env: COMPILER=gcc
-    - name: "Build with Clang 7 @ Ubuntu 16"
-      dist: xenial
-      compiler: clang
-      env: COMPILER=clang
-    - name: "Build with GCC 7 @ Ubuntu 18"
-      compiler: gcc
-      env: COMPILER=gcc
-    - name: "Build with GCC 9 @ Ubuntu 18"
-      compiler: gcc
-      env: COMPILER=gcc-9
-    - name: "Build with GCC 10 @ Ubuntu 18"
-      compiler: gcc
-      env: COMPILER=gcc-10
-    - name: "Build with Clang 7 @ Ubuntu 18"
-      compiler: clang
-      env: COMPILER=clang
-    - name: "Build with Clang 9 @ Ubuntu 18"
-      compiler: clang
-      env: COMPILER=clang-9
-    - name: "Build with Clang 10 @ Ubuntu 18"
-      compiler: clang
-      env: COMPILER=clang-10
-    - name: "Build with GCC 7 @ Ubuntu 18 (ARM64)"
-      compiler: gcc
-      arch: arm64
-      env: COMPILER=gcc
-    - name: "Build with Clang 7 @ Ubuntu 18 (ARM64)"
-      compiler: clang
-      arch: arm64
-      env: COMPILER=clang
-    - name: "Build Core with GCC 7 @ Ubuntu 18 (i386)"
-      compiler: gcc
-      env: COMPILER=gcc-i386-cross
-    - name: "Build Core with Clang 7 @ Ubuntu 18 (i386)"
-      compiler: clang
-      env: COMPILER=clang-i386-cross
-    - name: "Build Core with GCC 7 @ Ubuntu 18 (MIPS64)"
-      compiler: gcc
-      env: COMPILER=gcc-mips64-cross
+script:
+  # Wraps the compilation with the Build Wrapper to generate configuration (used
+  # later by the SonarScanner) into the "bw-output" folder
+  - build-wrapper-linux-x86-64 --out-dir bw-output make exclude_modules="db_oracle osp sngtc cachedb_cassandra cachedb_couchbase cachedb_mongodb auth_jwt" all
+  # And finally run the SonarCloud analysis - read the "sonar-project.properties"
+  # file to see the specific configuration
+  - sonar-scanner -Dsonar.cfamily.build-wrapper-output=bw-output -Dsonar.cfamily.threads=2 -Dsonar.cfamily.cache.enabled=false
